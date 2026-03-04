@@ -5,6 +5,7 @@ import { ModelPanel } from './components/ModelPanel';
 import { PromptInterface } from './components/PromptInterface';
 import { ProgressBar } from './components/ProgressBar';
 import { ImageDisplay } from './components/ImageDisplay';
+import { HowItWorks } from './components/HowItWorks';
 
 function App() {
   const {
@@ -15,6 +16,7 @@ function App() {
     error,
     loadedModelId,
     imageUrl,
+    elapsedTime,
     loadModel,
     generateImage,
     unloadModel,
@@ -22,17 +24,13 @@ function App() {
   } = useLumina();
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4rem 1rem', position: 'relative' }}>
       <Header />
-      
-      {/* Pop Art Background Accents */}
-      <div className="pop-circle" style={{ width: '300px', height: '300px', top: '-100px', right: '-100px' }}></div>
-      <div className="pop-circle" style={{ width: '200px', height: '200px', bottom: '100px', left: '-50px', transform: 'rotate(15deg)' }}></div>
       
       <WebGPUGuard isSupported={isWebGpuSupported} />
       
       {isWebGpuSupported && (
-        <main className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        <main className="animate-pop">
           <ModelPanel 
             loadedModelId={loadedModelId}
             isLoading={isLoading}
@@ -42,7 +40,7 @@ function App() {
 
           <PromptInterface 
             onGenerate={({ prompt, seed }) => generateImage(prompt, seed)}
-            onAbort={() => {}} // Custom abort logic can be added to engine
+            onAbort={() => {}} 
             isGenerating={isGenerating}
             isModelLoaded={!!loadedModelId}
           />
@@ -52,6 +50,7 @@ function App() {
             message={progress.message}
             isLoading={isLoading}
             isGenerating={isGenerating}
+            elapsedTime={elapsedTime}
           />
 
           <ImageDisplay 
@@ -60,24 +59,28 @@ function App() {
             error={error}
           />
 
-          <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '1rem' }}>
+          <HowItWorks />
+
+          <footer style={{ marginTop: '5rem', textAlign: 'center', opacity: 0.6 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '1.5rem' }}>
               <button 
                 onClick={purgeCache} 
                 style={{ 
                   background: 'none', 
                   border: 'none', 
-                  color: 'var(--text-muted)', 
-                  fontSize: '0.8rem', 
+                  color: 'black', 
+                  fontSize: '0.75rem', 
                   cursor: 'pointer',
-                  textDecoration: 'underline'
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  borderBottom: '2px solid black'
                 }}
               >
-                Clear engine cache
+                Clear_Cache
               </button>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              Built with Lumina Engine • Optimized FP16 Inference • Deep Private
+            <p style={{ color: 'black', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Lumina Browser Engine • No Servers • Secure Local AI
             </p>
           </footer>
         </main>

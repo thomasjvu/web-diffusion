@@ -1,20 +1,19 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=Outfit:wght@400;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@400;700&display=swap");
 
 :root {
-  /* High Contrast Monochrome Palette */
   --bg-primary: #ffffff;
   --bg-secondary: #000000;
   --text-primary: #000000;
   --text-secondary: #ffffff;
   
-  --border-width: 4px;
+  --border-width: 3px;
   --border-color: #000000;
   
-  --shadow-flat: 8px 8px 0px #000000;
+  --shadow-flat: 6px 6px 0px #000000;
   --transition: all 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
   
-  /* Helper for patterns */
-  --dot-color: rgba(0, 0, 0, 0.2);
+  /* Extremely subtle patterns */
+  --dot-color: rgba(0, 0, 0, 0.04);
 }
 
 * {
@@ -24,45 +23,25 @@
 }
 
 body {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
   
-  /* Global Halftone/Dither Background */
+  /* Very subtle global background */
   background-image: 
-    radial-gradient(var(--dot-color) 1px, transparent 1px),
-    radial-gradient(var(--dot-color) 4px, transparent 4px);
-  background-size: 20px 20px, 100px 100px;
-  background-position: 0 0, 50px 50px;
+    radial-gradient(var(--dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 h1, h2, h3 {
-  font-family: "Outfit", sans-serif;
-  font-weight: 900;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -2px;
+  letter-spacing: -1px;
 }
 
-/* Halftone Pattern Generator */
-.halftone-accent {
-  background-image: radial-gradient(circle at center, var(--text-primary) 20%, transparent 20%);
-  background-size: 8px 8px;
-}
-
-.dither-accent {
-  background-image: conic-gradient(
-    from 0deg at 50% 50%,
-    var(--text-primary) 25%,
-    transparent 0 50%,
-    var(--text-primary) 0 75%,
-    transparent 0
-  );
-  background-size: 2px 2px;
-}
-
-/* Neo-Brutalist Components */
 .brutalist-card {
   background: var(--bg-primary);
   border: var(--border-width) solid var(--border-color);
@@ -71,100 +50,55 @@ h1, h2, h3 {
 }
 
 .brutalist-card:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 12px 12px 0px #000000;
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0px #000000;
 }
 
 .btn-brutalist {
-  padding: 12px 24px;
+  padding: 10px 20px;
   background: var(--bg-primary);
   border: var(--border-width) solid var(--border-color);
   color: var(--text-primary);
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 4px 4px 0px #000000;
+  box-shadow: 3px 3px 0px #000000;
   transition: var(--transition);
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-size: 0.85rem;
 }
 
-.btn-brutalist:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px #000000;
+.btn-brutalist:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px #000000;
   background: var(--bg-secondary);
   color: var(--text-secondary);
 }
 
-.btn-brutalist:active {
-  transform: translate(2px, 2px);
-  box-shadow: 0px 0px 0px #000000;
-}
-
 .btn-brutalist:disabled {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: 2px 2px 0px #000000;
 }
 
 .input-brutalist {
   width: 100%;
-  padding: 16px;
+  padding: 14px;
   background: var(--bg-primary);
   border: var(--border-width) solid var(--border-color);
   font-family: inherit;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   outline: none;
-  box-shadow: 4px 4px 0px #000000;
+  box-shadow: 3px 3px 0px #000000;
   transition: var(--transition);
 }
 
 .input-brutalist:focus {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px #000000;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px #000000;
 }
 
-/* Animations */
-@keyframes flicker {
-  0% { opacity: 0.97; }
-  5% { opacity: 0.95; }
-  10% { opacity: 0.9; }
-  15% { opacity: 0.95; }
-  20% { opacity: 0.9; }
-  25% { opacity: 0.95; }
-  30% { opacity: 0.9; }
-  100% { opacity: 1; }
-}
-
-.animate-pop {
-  animation: flicker 0.1s infinite alternate;
-}
-
-/* Pop Art Circles */
-.pop-circle {
-  position: fixed;
-  border-radius: 50%;
-  z-index: -1;
-  opacity: 0.1;
-  border: 4px solid black;
-  background: radial-gradient(circle, black 20%, transparent 20%);
-  background-size: 10px 10px;
-}
 
 /* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-  border-left: var(--border-width) solid var(--border-color);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--bg-secondary);
-  border: 2px solid var(--bg-primary);
-}

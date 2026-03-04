@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Header: React.FC = () => {
   return (
-    <header className="animate-pop" style={{ textAlign: 'center', marginBottom: '4rem', marginTop: '2rem' }}>
+    <header style={{ textAlign: 'center', marginBottom: '4rem', marginTop: '2rem' }}>
       <h1 style={{ 
         fontSize: '4.5rem', 
         fontWeight: 900, 
@@ -10,7 +10,6 @@ export const Header: React.FC = () => {
         color: 'var(--text-primary)',
         marginBottom: '0',
         lineHeight: '1',
-        transform: 'rotate(-2deg)'
       }}>
         Lumina
       </h1>
@@ -18,29 +17,32 @@ export const Header: React.FC = () => {
         display: 'inline-block',
         background: 'var(--bg-secondary)',
         color: 'var(--text-secondary)',
-        padding: '4px 12px',
-        fontWeight: 700,
+        padding: '2px 10px',
+        fontWeight: 800,
         textTransform: 'uppercase',
-        fontSize: '1.2rem',
-        marginTop: '-10px',
-        transform: 'rotate(1deg)'
+        fontSize: '0.9rem',
+        marginTop: '4px',
       }}>
-        Diffusion Engine
+        Browser Engine v1.0
       </div>
-      <p style={{ 
-        color: 'var(--text-primary)', 
-        fontSize: '1.1rem', 
-        maxWidth: '500px', 
-        margin: '2rem auto 0',
-        fontWeight: 500,
-        lineHeight: '1.4',
+      <div style={{ 
+        maxWidth: '550px', 
+        margin: '2.5rem auto 0',
+        padding: '1.5rem',
         borderLeft: '4px solid black',
-        paddingLeft: '1rem',
+        background: 'rgba(0,0,0,0.02)',
         textAlign: 'left'
       }}>
-        Fully local, browser-based image synthesis. 
-        High-performance WebGPU inference with a pop-art soul.
-      </p>
+        <p style={{ 
+          fontSize: '1rem', 
+          fontWeight: 500,
+          color: 'var(--text-primary)',
+          lineHeight: '1.6',
+          margin: 0
+        }}>
+          <strong>Next-generation image synthesis.</strong> Fully local, browser-based inference powered by WebGPU. No servers, no tracking, just pure AI.
+        </p>
+      </div>
     </header>
   );
 };

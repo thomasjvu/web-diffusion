@@ -2,7 +2,7 @@ import * as ort from 'onnxruntime-web/webgpu';
 import { type WorkerRequest, type WorkerResponse, type ProgressEvent } from '../lib/engine/protocol';
 import { MODEL_REGISTRY } from '../lib/engine/registry';
 
-// Configure ORT
+// Configure ORT Globals
 ort.env.wasm.numThreads = (navigator as any).hardwareConcurrency || 4;
 ort.env.wasm.simd = true;
 
@@ -61,8 +61,8 @@ class LuminaWorker {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      chunks.push(value);
-      loaded += value.length;
+      chunks.push(value as any);
+      loaded += (value as any).length;
       onProgress(loaded, total);
     }
 
@@ -72,10 +72,19 @@ class LuminaWorker {
   }
 
   private async loadModel(modelId: string, _params: any) {
+    if (this.currentModelId === modelId) {
+       this.postProgress({ phase: 'loading', message: 'ENGINE_READY', pct: 100 });
+       self.postMessage({ type: 'result', payload: { ok: true } } as WorkerResponse);
+       return;
+    }
+
+    // Free previous sessions to save memory
+    await this.unload();
+
     const config = MODEL_REGISTRY[modelId];
     if (!config) throw new Error(`Model ${modelId} not found in registry`);
 
-    this.postProgress({ phase: 'loading', message: `Initializing ${modelId}...`, pct: 0 });
+    this.postProgress({ phase: 'loading', message: `INIT: ${modelId}`, pct: 0 });
     
     const files = Object.entries(config.files);
     const totalFiles = files.length;
@@ -83,33 +92,36 @@ class LuminaWorker {
 
     for (const [key, fileObj] of files) {
       const file = fileObj as any;
+      if (!file) continue;
+      
       const url = `${config.baseUrl}/${file.url}`;
       const buffer = await this.fetchWithCache(url, (loaded, total) => {
-        const overallPct = ((filesLoaded + (loaded / (total || file.size))) / totalFiles) * 85; // 85% for DL
+        const overallPct = ((filesLoaded + (loaded / (total || file.size))) / totalFiles) * 85; 
         this.postProgress({ 
           phase: 'loading', 
-          message: `Downloading ${key}...`, 
+          message: `SYNC: ${key}`, 
           pct: Math.round(overallPct),
         });
       });
 
-      this.postProgress({ phase: 'loading', message: `Compiling ${key} on GPU...` });
+      this.postProgress({ phase: 'loading', message: `MOUNT: ${key}` });
       
       const session = await ort.InferenceSession.create(new Uint8Array(buffer), {
         executionProviders: ['webgpu'],
-        graphOptimizationLevel: 'all'
-      });
+        graphOptimizationLevel: 'all',
+        enableCpuMemAccessReuse: true 
+      } as any);
       
       this.sessions[key] = session;
       filesLoaded++;
     }
 
-    this.postProgress({ phase: 'loading', message: 'Loading Tokenizer...', pct: 90 });
+    this.postProgress({ phase: 'loading', message: 'ATTACH_CORE', pct: 90 });
     const { AutoTokenizer } = await import('@xenova/transformers');
     this.tokenizer = await AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
 
     this.currentModelId = modelId;
-    this.postProgress({ phase: 'loading', message: 'Engine Ready', pct: 100 });
+    this.postProgress({ phase: 'loading', message: 'ENGINE_READY', pct: 100 });
     self.postMessage({ type: 'result', payload: { ok: true } } as WorkerResponse);
   }
 
@@ -124,11 +136,11 @@ class LuminaWorker {
       const start = performance.now();
 
       // 1. Tokenize
-      this.postProgress({ phase: 'tokenizing', message: 'Tokenizing...', pct: 5 });
+      this.postProgress({ phase: 'tokenizing', message: 'TOKENIZING', pct: 5 });
       const { input_ids } = await this.tokenizer(prompt, { padding: true, max_length: 77, truncation: true, return_tensor: false });
       
       // 2. Text Encoder
-      this.postProgress({ phase: 'encoding', message: 'Encoding prompt...', pct: 15 });
+      this.postProgress({ phase: 'encoding', message: 'ENCODING', pct: 15 });
       const ids = Int32Array.from(input_ids as number[]);
       const encOut: any = await this.sessions.text_encoder.run({ 
         input_ids: new ort.Tensor('int32', ids, [1, ids.length]) 
@@ -141,7 +153,7 @@ class LuminaWorker {
       const latents = randn_latents(latent_shape, sigma, seed);
 
       // 4. UNet (1 step for SD-Turbo)
-      this.postProgress({ phase: 'denoising', message: 'Denoising...', pct: 50 });
+      this.postProgress({ phase: 'denoising', message: 'DENOISING', pct: 50 });
       const tstep = [BigInt(999)];
       const scaled_latents = scale_model_inputs(latents, sigma);
       
@@ -157,7 +169,7 @@ class LuminaWorker {
       const new_latents = step(out_sample.data as Float32Array, latents, sigma, vae_scaling_factor);
 
       // 6. VAE Decode
-      this.postProgress({ phase: 'decoding', message: 'Decoding image...', pct: 90 });
+      this.postProgress({ phase: 'decoding', message: 'DECODING', pct: 90 });
       const vaeOut = await this.sessions.vae_decoder.run({ 
         latent_sample: new ort.Tensor('float32', new_latents, latent_shape) 
       });
@@ -167,7 +179,7 @@ class LuminaWorker {
       const blob = await tensorToPngBlob(sample);
       const timeMs = performance.now() - start;
 
-      this.postProgress({ phase: 'complete', message: `Done in ${Math.round(timeMs)}ms`, pct: 100 });
+      this.postProgress({ phase: 'complete', message: `DONE`, pct: 100 });
       self.postMessage({ type: 'result', payload: { blob, timeMs } } as WorkerResponse);
     } catch (err: any) {
       console.error('Generation Error:', err);
@@ -176,11 +188,18 @@ class LuminaWorker {
   }
 
   private async unload() {
-    for (const sess of Object.values(this.sessions)) {
-      await (sess as any).release();
+    for (const [key, sess] of Object.entries(this.sessions)) {
+      try {
+        await (sess as any).release();
+      } catch (e) {
+        console.warn(`Failed to release session ${key}:`, e);
+      }
     }
     this.sessions = {};
     this.currentModelId = null;
+    this.tokenizer = null;
+    // Suggest GC
+    if (typeof (self as any).gc === 'function') (self as any).gc();
     self.postMessage({ type: 'result', payload: { ok: true } } as WorkerResponse);
   }
 

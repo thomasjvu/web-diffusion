@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { engine } from '../lib/engine/LuminaEngine';
 import { type ProgressEvent, type EngineModelId } from '../lib/engine/protocol';
 
@@ -10,6 +10,10 @@ export function useLumina() {
   const [error, setError] = useState<string | null>(null);
   const [loadedModelId, setLoadedModelId] = useState<EngineModelId | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  // Timer state
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const checkSupport = async () => {
@@ -20,12 +24,33 @@ export function useLumina() {
       setIsWebGpuSupported(true);
     };
     checkSupport();
+    
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, []);
+
+  const startTimer = () => {
+    setElapsedTime(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    const start = Date.now();
+    timerRef.current = window.setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
   const loadModel = useCallback(async (modelId: EngineModelId) => {
     setIsLoading(true);
     setError(null);
     setProgress({ message: 'Initializing...', pct: 0 });
+    startTimer();
 
     try {
       await engine.loadModel(modelId, (p) => {
@@ -37,6 +62,7 @@ export function useLumina() {
     } finally {
       setIsLoading(false);
       setProgress({});
+      stopTimer();
     }
   }, []);
 
@@ -49,6 +75,7 @@ export function useLumina() {
     setIsGenerating(true);
     setError(null);
     setImageUrl(null);
+    startTimer();
 
     try {
       const blob = await engine.generate(prompt, seed, (p) => {
@@ -61,6 +88,7 @@ export function useLumina() {
     } finally {
       setIsGenerating(false);
       setProgress({});
+      stopTimer();
     }
   }, [loadedModelId]);
 
@@ -70,8 +98,9 @@ export function useLumina() {
   }, []);
 
   const purgeCache = useCallback(async () => {
-    // Implementation for purge in engine
-    setProgress({ message: 'Cache purged', pct: 0 });
+    await engine.unload(); // Unload first
+    // In a real scenario we'd call engine.purge()
+    setProgress({ message: 'Memory cleared', pct: 0 });
     setTimeout(() => setProgress({}), 2000);
   }, []);
 
@@ -83,9 +112,11 @@ export function useLumina() {
     error,
     loadedModelId,
     imageUrl,
+    elapsedTime,
     loadModel,
     generateImage,
     unloadModel,
     purgeCache
   };
 }
+
