@@ -249,7 +249,6 @@ class LuminaWorker {
     const last_hidden_state = encOut.last_hidden_state ?? encOut;
 
     // 3. Create latents and scheduler
-    const vae_scaling_factor = 0.18215;
     const sigma = 14.6146;
     const latents: Float32Array = randn_latents(latent_shape, sigma, seed);
     this.log('Random latents initialized');
@@ -278,13 +277,13 @@ class LuminaWorker {
       
       const out_sample = unetOut.out_sample ?? unetOut;
       
-      // Euler step: x_t-1 = x_t - (sigma_t - sigma_t+1) * prediction
+      // Euler step
       const newLatents = eulerStep(
         out_sample.data as any,
         currentLatents,
         t,
         tNext,
-        vae_scaling_factor
+        0
       );
       currentLatents = newLatents;
       
@@ -366,22 +365,21 @@ function randn_latents(shape: number[], sigma: number, seed?: number) {
   return data;
 }
 
-function scale_model_inputs(data: Float32Array, sigma: number) {
+function scale_model_inputs(data: Float32Array, _sigma: number) {
   const out = new Float32Array(data.length);
-  const scale = 1 / Math.sqrt(sigma * sigma + 1);
-  for (let i = 0; i < data.length; i++) out[i] = data[i] * scale;
+  for (let i = 0; i < data.length; i++) out[i] = data[i];
   return out;
 }
 
-function eulerStep(model_out: Float32Array | Float64Array, sample: Float32Array, t: number, tNext: number, scale: number): Float32Array {
+function eulerStep(model_out: Float32Array | Float64Array, sample: Float32Array, t: number, tNext: number, _scale: number): Float32Array {
   const out = new Float32Array(model_out.length);
-  const sigma = t / 1000 * 14.6146;
-  const sigmaNext = tNext / 1000 * 14.6146;
-  const dt = sigma - sigmaNext;
+  const sigmaNow = t / 1000;
+  const sigmaNext = tNext / 1000;
   
   for (let i = 0; i < model_out.length; i++) {
-    const pred_original = sample[i] - sigma * model_out[i];
-    out[i] = sample[i] + dt * pred_original / scale;
+    const noise_pred = model_out[i];
+    const pred_original = (sample[i] - sigmaNow * noise_pred) / Math.sqrt(sigmaNow * sigmaNow + 1);
+    out[i] = sigmaNext * pred_original + sigmaNext * noise_pred / Math.sqrt(sigmaNow * sigmaNow + 1);
   }
   return out;
 }
