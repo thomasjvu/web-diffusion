@@ -1,4 +1,4 @@
-import { type WorkerRequest, type WorkerResponse, type ProgressEvent, type EngineModelId } from './protocol';
+import { type WorkerRequest, type WorkerResponse, type ProgressEvent, type EngineModelId, type ImageSizePreset } from './protocol';
 
 export class LuminaEngine {
   private worker: Worker;
@@ -53,12 +53,12 @@ export class LuminaEngine {
     });
   }
 
-  async generate(prompt: string, seed?: number, onProgress?: (e: ProgressEvent) => void): Promise<Blob> {
+  async generate(prompt: string, seed: number | undefined, size: ImageSizePreset, steps: number, onProgress?: (e: ProgressEvent) => void): Promise<Blob> {
     this.onProgressCb = onProgress;
     return new Promise((resolve, reject) => {
       this.resolveGen = (payload: any) => resolve(payload.blob);
       this.rejectGen = reject;
-      this.worker.postMessage({ type: 'generate', params: { prompt, seed } } as WorkerRequest);
+      this.worker.postMessage({ type: 'generate', params: { prompt, seed, size, steps } } as WorkerRequest);
     });
   }
 

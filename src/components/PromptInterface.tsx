@@ -1,7 +1,8 @@
 import React from 'react';
+import type { ImageSizePreset } from '../lib/engine/protocol';
 
 interface PromptInterfaceProps {
-  onGenerate: (params: { prompt: string; seed?: number }) => void;
+  onGenerate: (params: { prompt: string; seed?: number; size: ImageSizePreset; steps: number }) => void;
   onAbort: () => void;
   isGenerating: boolean;
   isModelLoaded: boolean;
@@ -15,13 +16,17 @@ export const PromptInterface: React.FC<PromptInterfaceProps> = ({
 }) => {
   const [prompt, setPrompt] = React.useState('japanese cherry blossoms, anime, school building, visual novel, niji');
   const [seed, setSeed] = React.useState<string>('');
+  const [size, setSize] = React.useState<ImageSizePreset>('512x512');
+  const [steps, setSteps] = React.useState<number>(20);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt || isGenerating || !isModelLoaded) return;
     onGenerate({ 
       prompt, 
-      seed: seed === '' ? undefined : Number(seed) 
+      seed: seed === '' ? undefined : Number(seed),
+      size,
+      steps
     });
   };
 
@@ -43,7 +48,7 @@ export const PromptInterface: React.FC<PromptInterfaceProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ flex: 1, minWidth: '140px' }}>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
               SEED_PARAM (OPTIONAL)
             </label>
@@ -55,6 +60,39 @@ export const PromptInterface: React.FC<PromptInterfaceProps> = ({
               onChange={(e) => setSeed(e.target.value)}
               disabled={!isModelLoaded || isGenerating}
               style={{ padding: '12px' }}
+            />
+          </div>
+
+          <div style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+              IMAGE_SIZE
+            </label>
+            <select 
+              className="input-brutalist"
+              value={size}
+              onChange={(e) => setSize(e.target.value as ImageSizePreset)}
+              disabled={!isModelLoaded || isGenerating}
+              style={{ padding: '12px', width: '100%' }}
+            >
+              <option value="256x256">256 x 256</option>
+              <option value="512x512">512 x 512</option>
+              <option value="1024x1024">1024 x 1024</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+              STEPS
+            </label>
+            <input 
+              type="number"
+              className="input-brutalist"
+              min={1}
+              max={50}
+              value={steps}
+              onChange={(e) => setSteps(Number(e.target.value))}
+              disabled={!isModelLoaded || isGenerating}
+              style={{ padding: '12px', width: '100%' }}
             />
           </div>
           

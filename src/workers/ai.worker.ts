@@ -1,6 +1,6 @@
 import * as ort from 'onnxruntime-web';
 import { type WorkerRequest, type WorkerResponse, type ProgressEvent } from '../lib/engine/protocol';
-import { MODEL_REGISTRY, type ModelArchitecture } from '../lib/engine/registry';
+import { MODEL_REGISTRY, type ModelArchitecture, IMAGE_SIZES, type ImageSizePreset } from '../lib/engine/registry';
 
 // Global Environment Setup (Optimized for 8GB Mac)
 ort.env.wasm.numThreads = (navigator as any).hardwareConcurrency || 4;
@@ -221,11 +221,15 @@ class LuminaWorker {
     }
   }
 
-  private async generateSD(params: { prompt: string; seed?: number }) {
-    const { prompt, seed } = params;
+  private async generateSD(params: { prompt: string; seed?: number; size?: ImageSizePreset; steps?: number }) {
+    const { prompt, seed, size = '512x512', steps = 20 } = params;
     const start = performance.now();
 
     this.log(`Starting SD pipeline for: "${prompt.substring(0, 30)}..."`);
+    this.log(`Image size: ${size}, Steps: ${steps}`);
+
+    const imageSize = IMAGE_SIZES[size];
+    const latent_shape = [1, 4, imageSize.latentHeight, imageSize.latentWidth];
 
     // 1. Tokenize
     this.postProgress({ phase: 'tokenizing', message: 'TKN', pct: 5 });
@@ -233,7 +237,7 @@ class LuminaWorker {
     this.log(`Tokens generated: ${input_ids.length}`);
     
     // 2. Text Encoder
-    this.postProgress({ phase: 'encoding', message: 'ENC', pct: 15 });
+    this.postProgress({ phase: 'encoding', message: 'ENC', pct: 10 });
     this.log('Running Text Encoder (WebGPU)...');
     const ids = BigInt64Array.from((input_ids as number[]).map(BigInt));
     const encStart = performance.now();
@@ -244,43 +248,65 @@ class LuminaWorker {
     
     const last_hidden_state = encOut.last_hidden_state ?? encOut;
 
-    // 3. Latents
-    const latent_shape = [1, 4, 64, 64];
+    // 3. Create latents and scheduler
+    const vae_scaling_factor = 0.18215;
     const sigma = 14.6146;
-    const latents = randn_latents(latent_shape, sigma, seed);
+    const latents: Float32Array = randn_latents(latent_shape, sigma, seed);
     this.log('Random latents initialized');
 
-    // 4. UNet (1 step)
-    this.postProgress({ phase: 'denoising', message: 'SYNTH', pct: 50 });
-    this.log('Starting UNet denoising step...');
-    const scaled_latents = scale_model_inputs(latents, sigma);
-    
-    const unetStart = performance.now();
-    const unetOut: any = await this.sessions.unet.run({
-      sample: new ort.Tensor('float32', scaled_latents, latent_shape),
-      timestep: new ort.Tensor('float32', [999], []),
-      encoder_hidden_states: last_hidden_state
-    });
-    this.log(`UNet step finished in ${(performance.now() - unetStart).toFixed(0)}ms`);
-    
-    const out_sample = unetOut.out_sample ?? unetOut;
+    // Create timesteps for Euler scheduler (from high to low)
+    const timesteps = this.createTimesteps(steps);
+    this.log(`Running ${steps} denoising steps...`);
 
-    // 5. Scheduler step
-    const vae_scaling_factor = 0.18215;
-    const new_latents = step(out_sample.data as Float32Array, latents, sigma, vae_scaling_factor);
+    let currentLatents: Float32Array = latents;
+    
+    // 4. Denoising loop
+    for (let i = 0; i < timesteps.length; i++) {
+      const t = timesteps[i];
+      const tNext = i < timesteps.length - 1 ? timesteps[i + 1] : 0;
+      
+      this.postProgress({ phase: 'denoising', message: `SYNTH ${i + 1}/${steps}`, pct: 15 + Math.round((i / steps) * 65) });
+      
+      const scaled_latents = scale_model_inputs(currentLatents, t);
+      
+      const unetStart = performance.now();
+      const unetOut: any = await this.sessions.unet.run({
+        sample: new ort.Tensor('float32', scaled_latents, latent_shape),
+        timestep: new ort.Tensor('float32', [t], []),
+        encoder_hidden_states: last_hidden_state
+      });
+      
+      const out_sample = unetOut.out_sample ?? unetOut;
+      
+      // Euler step: x_t-1 = x_t - (sigma_t - sigma_t+1) * prediction
+      const newLatents = eulerStep(
+        out_sample.data as any,
+        currentLatents,
+        t,
+        tNext,
+        vae_scaling_factor
+      );
+      currentLatents = newLatents;
+      
+      if (i % 5 === 0 || i === timesteps.length - 1) {
+        this.log(`Step ${i + 1}/${steps} done (${(performance.now() - unetStart).toFixed(0)}ms)`);
+      }
+    }
 
-    // 6. VAE Decode
+    this.log('Denoising complete, decoding with VAE...');
+
+    // 5. VAE Decode
     this.postProgress({ phase: 'decoding', message: 'DEC', pct: 90 });
     this.log('Decoding latents to RGB (VAE)...');
     const vaeStart = performance.now();
     const vaeOut = await this.sessions.vae_decoder.run({ 
-      latent_sample: new ort.Tensor('float32', new_latents, latent_shape) 
+      latent_sample: new ort.Tensor('float32', currentLatents, latent_shape) 
     });
     this.log(`VAE finish in ${(performance.now() - vaeStart).toFixed(0)}ms`);
     
     const sample = vaeOut.sample ?? vaeOut;
 
-    // 7. Render
+    // 6. Render
     this.log('Rendering texture to Blob...');
     const blob = await tensorToPngBlob(sample);
     const timeMs = performance.now() - start;
@@ -288,6 +314,15 @@ class LuminaWorker {
     this.log(`Total generation time: ${(timeMs / 1000).toFixed(2)}s`);
     this.postProgress({ phase: 'complete', message: 'DONE', pct: 100 });
     self.postMessage({ type: 'result', payload: { blob, timeMs } } as WorkerResponse);
+  }
+
+  private createTimesteps(numSteps: number): number[] {
+    const timesteps: number[] = [];
+    for (let i = 0; i < numSteps; i++) {
+      const t = Math.round(999 - (i / (numSteps - 1)) * 999);
+      timesteps.push(t);
+    }
+    return timesteps;
   }
 
   private async generateJanus(_params: { prompt: string }) {
@@ -338,11 +373,15 @@ function scale_model_inputs(data: Float32Array, sigma: number) {
   return out;
 }
 
-function step(model_out: Float32Array, sample: Float32Array, sigma: number, scale: number) {
+function eulerStep(model_out: Float32Array | Float64Array, sample: Float32Array, t: number, tNext: number, scale: number): Float32Array {
   const out = new Float32Array(model_out.length);
+  const sigma = t / 1000 * 14.6146;
+  const sigmaNext = tNext / 1000 * 14.6146;
+  const dt = sigma - sigmaNext;
+  
   for (let i = 0; i < model_out.length; i++) {
-    const pred = sample[i] - sigma * model_out[i];
-    out[i] = (sample[i] + (sample[i] - pred) * -1) / scale;
+    const pred_original = sample[i] - sigma * model_out[i];
+    out[i] = sample[i] + dt * pred_original / scale;
   }
   return out;
 }

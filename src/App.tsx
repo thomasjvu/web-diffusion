@@ -41,7 +41,7 @@ function App() {
           />
 
           <PromptInterface 
-            onGenerate={({ prompt, seed }) => generateImage(prompt, seed)}
+            onGenerate={({ prompt, seed, size, steps }) => generateImage(prompt, seed, size, steps)}
             onAbort={() => {}} 
             isGenerating={isGenerating}
             isModelLoaded={!!loadedModelId}

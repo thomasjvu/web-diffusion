@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { engine } from '../lib/engine/LuminaEngine';
-import { type ProgressEvent, type EngineModelId } from '../lib/engine/protocol';
+import { type ProgressEvent, type EngineModelId, type ImageSizePreset } from '../lib/engine/protocol';
 
 export function useLumina() {
   const [isWebGpuSupported, setIsWebGpuSupported] = useState<boolean | null>(null);
@@ -71,7 +71,7 @@ export function useLumina() {
     }
   }, []);
 
-  const generateImage = useCallback(async (prompt: string, seed?: number) => {
+  const generateImage = useCallback(async (prompt: string, seed: number | undefined, size: ImageSizePreset, steps: number) => {
     if (!loadedModelId) {
       setError('Model not loaded');
       return;
@@ -84,7 +84,7 @@ export function useLumina() {
     startTimer();
 
     try {
-      const blob = await engine.generate(prompt, seed, (p) => {
+      const blob = await engine.generate(prompt, seed, size, steps, (p) => {
         if (p.phase === 'log') {
           setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${p.message}`]);
         } else {

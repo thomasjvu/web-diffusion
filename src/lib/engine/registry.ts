@@ -1,5 +1,20 @@
 export type ModelArchitecture = 'stable-diffusion' | 'janus';
 
+export type ImageSizePreset = '256x256' | '512x512' | '1024x1024';
+
+export interface ImageSize {
+  width: number;
+  height: number;
+  latentWidth: number;
+  latentHeight: number;
+}
+
+export const IMAGE_SIZES: Record<ImageSizePreset, ImageSize> = {
+  '256x256': { width: 256, height: 256, latentWidth: 32, latentHeight: 32 },
+  '512x512': { width: 512, height: 512, latentWidth: 64, latentHeight: 64 },
+  '1024x1024': { width: 1024, height: 1024, latentWidth: 128, latentHeight: 128 },
+};
+
 export interface ModelMetadata {
   id: string;
   name: string;
