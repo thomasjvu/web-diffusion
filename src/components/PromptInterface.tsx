@@ -13,7 +13,7 @@ export const PromptInterface: React.FC<PromptInterfaceProps> = ({
   isGenerating, 
   isModelLoaded 
 }) => {
-  const [prompt, setPrompt] = React.useState('');
+  const [prompt, setPrompt] = React.useState('japanese cherry blossoms, anime, school building, visual novel, niji');
   const [seed, setSeed] = React.useState<string>('');
 
   const handleSubmit = (e: React.FormEvent) => {

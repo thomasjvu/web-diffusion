@@ -7,6 +7,7 @@ export function useLumina() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<Partial<ProgressEvent>>({});
+  const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedModelId, setLoadedModelId] = useState<EngineModelId | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -49,12 +50,16 @@ export function useLumina() {
   const loadModel = useCallback(async (modelId: EngineModelId) => {
     setIsLoading(true);
     setError(null);
-    setProgress({ message: 'Initializing...', pct: 0 });
+    setLogs([]); 
     startTimer();
 
     try {
       await engine.loadModel(modelId, (p) => {
-        setProgress(p);
+        if (p.phase === 'log') {
+          setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${p.message}`]);
+        } else {
+          setProgress(p);
+        }
       });
       setLoadedModelId(modelId);
     } catch (err: any) {
@@ -75,11 +80,16 @@ export function useLumina() {
     setIsGenerating(true);
     setError(null);
     setImageUrl(null);
+    setLogs([]);
     startTimer();
 
     try {
       const blob = await engine.generate(prompt, seed, (p) => {
-        setProgress(p);
+        if (p.phase === 'log') {
+          setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${p.message}`]);
+        } else {
+          setProgress(p);
+        }
       });
       const url = URL.createObjectURL(blob);
       setImageUrl(url);
@@ -98,8 +108,7 @@ export function useLumina() {
   }, []);
 
   const purgeCache = useCallback(async () => {
-    await engine.unload(); // Unload first
-    // In a real scenario we'd call engine.purge()
+    await engine.unload(); 
     setProgress({ message: 'Memory cleared', pct: 0 });
     setTimeout(() => setProgress({}), 2000);
   }, []);
@@ -113,10 +122,10 @@ export function useLumina() {
     loadedModelId,
     imageUrl,
     elapsedTime,
+    logs,
     loadModel,
     generateImage,
     unloadModel,
     purgeCache
   };
 }
-

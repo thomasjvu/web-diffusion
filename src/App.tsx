@@ -6,6 +6,7 @@ import { PromptInterface } from './components/PromptInterface';
 import { ProgressBar } from './components/ProgressBar';
 import { ImageDisplay } from './components/ImageDisplay';
 import { HowItWorks } from './components/HowItWorks';
+import { TelemetryTerminal } from './components/TelemetryTerminal';
 
 function App() {
   const {
@@ -20,7 +21,8 @@ function App() {
     loadModel,
     generateImage,
     unloadModel,
-    purgeCache
+    purgeCache,
+    logs
   } = useLumina();
 
   return (
@@ -52,6 +54,8 @@ function App() {
             isGenerating={isGenerating}
             elapsedTime={elapsedTime}
           />
+
+          <TelemetryTerminal logs={logs} />
 
           <ImageDisplay 
             imageUrl={imageUrl}
